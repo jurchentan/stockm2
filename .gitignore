@@ -1,6 +1,7 @@
 # Ignore environment and build files
 .env
 venv/
+.venv/
 
 # Ignore __pycache__ directories
 __pycache__/

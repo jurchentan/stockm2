@@ -1,33 +1,55 @@
-# stock-model-2
+# Stock M2
 
-stock model v2 for qunatamental analysis and beyond
+Stock M2 is a modernized Buffett-style stock valuation toolkit with:
 
-# project structure
+- A pure, testable Buffett model in `src/stockm2/models/buffett.py`
+- Provider interfaces for offline fixtures and live APIs
+- A CLI for repeatable scripting
+- A Streamlit UI for local interactive analysis
+- A small backtesting module for deterministic signal experiments
 
-## test
+## Quick Start
 
-- chatgpt_metrics.txt: a file to process quickfs metrics for chatGPT to write API calls
-- input_test_v1: terminal output for first iteration of the model objects
-- quickfs_api_template.txt: json template for quickfs API calls
+Install in editable mode:
 
-## iter 1: quickfs
+```bash
+pip install -e .[dev]
+```
 
-pipeline: input.py -> eps.py -> buysell.py
-all_stocks.py: a list of stock tickers
+Run tests:
 
-- input.py: takes in a ticker and returns the EPS data
-- eps.py: takes in the EPS data and returns the EPS growth rate
-- buysell.py: takes in the EPS growth rate and returns a buy/sell recommendation
+```bash
+pytest
+```
 
-## iter 2: alphavantage
+Run the CLI with fixture data:
 
-- avinput.py: **********\_\_\_**********
-- alplhavantagemethods.py: **********\_\_**********
+```bash
+stockm2 buffett AAPL --fixture tests/fixtures/buffett_inputs.json
+stockm2 buffett --tickers AAPL,MSFT --format json
+```
 
-## backtesting
+Run the Streamlit UI:
 
-- backtesting.py: **********\_\_\_**********
+```bash
+streamlit run src/stockm2/ui/app.py
+```
 
-# references
+## Project Structure
 
-notion wiki
+- `src/stockm2/models/`: Buffett valuation logic
+- `src/stockm2/data/providers/`: provider interface plus fixture and FMP adapters
+- `src/stockm2/ui/`: Streamlit MVP UI
+- `src/stockm2/backtesting/`: simple signal and backtest helpers
+- `tests/`: fixture-driven unit and CLI tests
+- `docs/`: legacy behavior, data source notes, provider evaluation, and backtesting notes
+- `model/`: legacy QuickFS-era reference code
+- `greenblatt_model/`, `graham_model/`: archived experiments
+
+## Legacy Reference
+
+The legacy Buffett pipeline remains documented for reference:
+
+- `docs/legacy-buffett-model.md`
+- `docs/legacy-data-sources.md`
+- `MODERNIZATION_PLAN.md`
