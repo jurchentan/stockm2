@@ -9,6 +9,7 @@ __pycache__/
 # Ignore other temporary or build-specific files
 *.py[cod]
 *$py.class
+*.egg-info/
 
 # IDE and editor settings
 .vscode/
