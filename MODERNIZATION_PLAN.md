@@ -71,7 +71,8 @@ Primary goals:
 - Replace QuickFS with a sustainable data layer.
 - Extract the Buffett model into pure, tested functions or classes.
 - Make model assumptions explicit and configurable.
-- Add a reliable CLI first; add UI only after the model and data pipeline are stable.
+- Add a UI that lets the user control both ticker selection and model assumptions.
+- Keep a reliable CLI for scripting, testing, and offline use.
 - Add black-box tests using fixed fixture data before changing model math.
 - Keep Greenblatt and Graham code archived or documented, but out of scope for the first modernization pass.
 
@@ -131,8 +132,30 @@ Actions:
 Proposed model objects:
 
 - `BuffettInput`: ticker, company name, latest EPS, EPS growth history, PE history, current price, fiscal years.
-- `BuffettConfig`: forecast years, target return, sell return, margin of safety, max EPS growth, dampener settings, weighting settings.
+- `BuffettConfig`: forecast years, target return, sell return, margin of safety, max EPS growth, dampener settings, weighting settings, rejection thresholds, and toggles for legacy versus custom behavior.
 - `BuffettValuation`: average EPS growth, adjusted EPS growth, average PE, projected EPS, projected future price, target price, buy price, optional sell price, current-price gap, rejection reasons.
+
+Minimum configurable assumptions for the first UI and API surface:
+
+- Ticker or ticker list to analyze.
+- Weight historical EPS growth years: `true` or `false`.
+- Year weights when weighting is enabled.
+- EPS growth clipping enabled or disabled.
+- EPS growth clipping bounds.
+- Maximum allowed number of non-positive EPS growth years before rejection.
+- Dampener enabled or disabled.
+- Dampener calculation mode.
+- Dampener parameters for each mode.
+- Forecast horizon in years.
+- Discount rate / target return.
+- Margin of safety.
+- PE basis: average historical PE, latest PE, or manual override.
+
+Initial dampener modes to support:
+
+- `legacy`: current repo behavior.
+- `fixed`: user supplies a constant dampener.
+- `per_negative_year`: user configures the starting dampener and reduction per non-positive year.
 
 Deliverables:
 
@@ -191,15 +214,65 @@ Deliverables:
 - Provider fixture tests with recorded sample responses.
 - Clear `.env.example` entries for API keys without printing secrets.
 
-## Phase 5: Add A Modern CLI
+## Phase 5: Add A Modern UI And CLI
+
+The Buffett rework should ship with an interface that makes the model usable without editing code. The UI is not a later nice-to-have; it is part of the first practical version.
 
 Actions:
 
+- Add a local-first UI for Buffett analysis.
+- Support entering one ticker, multiple tickers, or uploading a ticker list.
+- Expose Buffett assumptions as editable form controls.
+- Show both the final valuation and the assumptions used to produce it.
+- Show rejection reasons clearly for filtered-out stocks.
+- Provide a way to restore legacy defaults with one action.
+- Keep a CLI entry point such as `stockm2 buffett AAPL` for scripting and automated testing.
 - Add a CLI entry point such as `stockm2 buffett AAPL`.
 - Support single ticker and ticker-list input.
 - Support JSON and table output.
 - Add flags for forecast years, target return, margin of safety, provider, and offline fixture mode.
 - Ensure the CLI never prints API keys.
+
+Minimum UI controls for the first version:
+
+- Ticker input.
+- Multi-ticker input.
+- Data provider selection.
+- Weight years toggle.
+- Editable year weights.
+- EPS growth clipping toggle.
+- Min and max EPS growth clip values.
+- Max non-positive EPS growth years.
+- Dampener mode selector.
+- Dampener parameters.
+- Forecast horizon.
+- Discount rate.
+- Margin of safety.
+- PE basis selector.
+- Manual PE override when selected.
+
+Minimum UI outputs:
+
+- Company name and ticker.
+- Current price.
+- Historical EPS series used.
+- Historical EPS growth series used.
+- Historical PE series used.
+- Average EPS growth.
+- Adjusted EPS growth after weighting, clipping, and dampener logic.
+- Projected EPS.
+- Projected future price.
+- Discounted target price.
+- Buy price.
+- Current price versus buy price gap.
+- Pass or reject status.
+- Rejection reasons.
+- Assumptions snapshot for reproducibility.
+
+Recommended first UI path:
+
+- Start with Streamlit or a similarly fast local UI so the model can be inspected and adjusted quickly.
+- Keep the UI thin and drive everything through the same pure model and provider interfaces used by the CLI.
 
 Example commands:
 
@@ -212,8 +285,10 @@ stockm2 buffett --fixture tests/fixtures/aapl_buffett.json
 
 Deliverables:
 
+- UI module with configurable Buffett model controls.
 - CLI module and package entry point.
 - CLI black-box tests.
+- UI smoke tests where practical.
 - README usage examples.
 
 ## Phase 6: Add Backtesting
@@ -232,21 +307,21 @@ Deliverables:
 - Backtest fixtures or cached provider data.
 - Documentation on backtest assumptions and known biases.
 
-## Phase 7: Add UI Or API After The Core Is Stable
+## Phase 7: Add API And Reporting After The Core Is Stable
 
-The first UI should be small and boring: show assumptions, inputs, valuation output, and rejection reasons clearly.
+Once the model, provider layer, UI, and CLI are stable, add secondary interfaces.
 
 Possible paths:
 
-- Streamlit for quickest local research UI.
-- FastAPI plus a small frontend if a reusable API is desired.
+- FastAPI if a reusable programmatic service is desired.
 - Static report generation if the main workflow is batch screening.
+- Saved assumption presets for repeatable research runs.
 
-Recommended first UI:
+Recommended follow-up work:
 
-- Start with a CLI and JSON output.
 - Add generated Markdown or HTML valuation reports.
-- Only then build an interactive UI.
+- Add sharable assumption presets.
+- Add an API only after the UI and CLI are both stable on the same model core.
 
 ## Proposed Target Structure
 
@@ -272,6 +347,8 @@ stockm2/
           fmp.py
           eodhd.py
       cli.py
+      ui/
+        app.py
       backtesting/
   tests/
     fixtures/
@@ -287,8 +364,9 @@ stockm2/
 4. Extract the Buffett formula into `src/stockm2/models/buffett.py` while preserving legacy outputs.
 5. Evaluate Financial Modeling Prep and EODHD with one or two tickers before committing to a provider.
 6. Implement one provider adapter and normalize provider output into `BuffettInput`.
-7. Add a CLI around the normalized provider plus pure model.
-8. Archive QuickFS scripts once the new path can reproduce at least one fixture valuation.
+7. Add a minimal UI that exposes tickers and Buffett assumptions as user controls.
+8. Add a CLI around the normalized provider plus pure model.
+9. Archive QuickFS scripts once the new path can reproduce at least one fixture valuation.
 
 ## Open Decisions
 
@@ -305,6 +383,7 @@ stockm2/
 - The repo has automated tests for the core valuation behavior.
 - Running model code does not require QuickFS.
 - Model math can run offline from fixture data.
-- A single ticker can be valued through a documented CLI command.
+- A single ticker can be valued through both a documented UI flow and a documented CLI command.
+- A user can change ticker inputs and Buffett assumptions without editing code.
 - API keys are not printed or committed.
 - Greenblatt and Graham experiments remain preserved but do not block the Buffett model cleanup.
