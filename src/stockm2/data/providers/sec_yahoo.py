@@ -103,10 +103,10 @@ class SecYahooProvider(FundamentalsProvider):
                     deduped_by_year[item["fy"]] = item
 
             annual_eps = [deduped_by_year[year] for year in sorted(deduped_by_year)]
-            if len(annual_eps) >= years + 1:
+            if len(annual_eps) >= 2:
                 return concept, annual_eps[-(years + 1) :]
 
-        raise ProviderError(f"Not enough annual diluted EPS history in SEC companyfacts for {years + 1} years")
+        raise ProviderError("Not enough annual diluted EPS history in SEC companyfacts to compute annual growth")
 
     def _get_yahoo_chart(self, ticker: str, start_date: str) -> dict[str, object]:
         payload = self._get_json(
@@ -193,8 +193,8 @@ class SecYahooProvider(FundamentalsProvider):
             year_end_price = self._latest_price_on_or_before(str(current["end"]), price_by_date)
             pe_history.append(year_end_price / current_eps)
 
-        if len(eps_growth_history) < years or len(pe_history) < years:
-            raise ProviderError(f"Not enough SEC/Yahoo history to build a {years}-year Buffett input for {ticker}")
+        if not eps_growth_history or not pe_history:
+            raise ProviderError(f"Not enough SEC/Yahoo history to build a Buffett input for {ticker}")
 
         entity_name = companyfacts.get("entityName")
         company_name = str(entity_name or ticker.upper())
@@ -202,10 +202,10 @@ class SecYahooProvider(FundamentalsProvider):
             ticker=ticker.upper(),
             company_name=company_name,
             latest_eps=latest_eps,
-            eps_growth_history=eps_growth_history[-years:],
-            pe_history=pe_history[-years:],
+            eps_growth_history=eps_growth_history,
+            pe_history=pe_history,
             current_price=current_price,
-            fiscal_years=fiscal_years[-years:],
+            fiscal_years=fiscal_years,
             sources=[
                 DataSource(
                     label="SEC Companyfacts ticker mapping",

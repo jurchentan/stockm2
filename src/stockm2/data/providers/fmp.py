@@ -70,17 +70,17 @@ class FMPProvider(FundamentalsProvider):
                 continue
             pe_history.append(year_close / float(eps))
 
-        if len(eps_growth_history) < years or len(pe_history) < years:
-            raise ProviderError(f"Not enough annual history to build a {years}-year Buffett input for {ticker}")
+        if not eps_growth_history or not pe_history:
+            raise ProviderError(f"Not enough annual history to build a Buffett input for {ticker}")
 
         return BuffettInput(
             ticker=ticker.upper(),
             company_name=str(quote[0].get("companyName") or ticker.upper()),
             latest_eps=latest_eps,
-            eps_growth_history=eps_growth_history[-years:],
-            pe_history=pe_history[-years:],
+            eps_growth_history=eps_growth_history,
+            pe_history=pe_history,
             current_price=float(quote[0]["price"]),
-            fiscal_years=fiscal_years[-years:],
+            fiscal_years=fiscal_years,
             sources=[
                 DataSource(
                     label="Financial Modeling Prep quote API",

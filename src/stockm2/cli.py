@@ -78,7 +78,7 @@ def _build_parser() -> argparse.ArgumentParser:
     buffett.add_argument("--clip-min", type=float, default=-0.5)
     buffett.add_argument("--clip-max", type=float, default=0.5)
     buffett.add_argument("--max-non-positive-growth-years", type=int, default=2)
-    buffett.add_argument("--dampener-mode", choices=["legacy", "fixed", "per_negative_year"], default="legacy")
+    buffett.add_argument("--dampener-mode", choices=["legacy", "legacy_1_0", "fixed", "per_negative_year", "none"], default="legacy")
     buffett.add_argument("--fixed-dampener", type=float, default=0.8)
     buffett.add_argument("--dampener-start", type=float, default=0.8)
     buffett.add_argument("--dampener-reduction", type=float, default=0.1)

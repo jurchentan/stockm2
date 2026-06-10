@@ -6,7 +6,7 @@ from typing import Literal
 
 
 PEBasis = Literal["average", "latest", "manual"]
-DampenerMode = Literal["legacy", "fixed", "per_negative_year"]
+DampenerMode = Literal["legacy", "legacy_1_0", "fixed", "per_negative_year", "none"]
 
 
 @dataclass(slots=True)
@@ -79,6 +79,10 @@ class BuffettValuation:
     buy_price: float
     sell_price: float
     current_price_gap: float | None
+    current_vs_target_gap: float | None
+    current_vs_target_amount: float
+    current_vs_projected_future_gap: float | None
+    current_vs_projected_future_amount: float
     accepted: bool
     rejection_reasons: list[str]
     sources: list[DataSource]
@@ -103,9 +107,10 @@ def apply_weighting(growth_history: list[float], config: BuffettConfig) -> list[
     growth_history = _require_numeric_series("eps_growth_history", growth_history, 1)
     if not config.weighted_growth:
         return list(growth_history)
-    if len(growth_history) != len(config.year_weights):
-        raise ValueError("weighted legacy mode expects growth history length to match year weights")
-    return [growth * weight for growth, weight in zip(growth_history, config.year_weights)]
+    if len(growth_history) > len(config.year_weights):
+        raise ValueError("weighted legacy mode expects growth history length to be at most year weights length")
+    weights = config.year_weights[-len(growth_history) :]
+    return [growth * weight for growth, weight in zip(growth_history, weights)]
 
 
 def apply_clipping(growth_history: list[float], config: BuffettConfig) -> list[float]:
@@ -119,7 +124,7 @@ def count_non_positive_growth_years(weighted_growth_history: list[float]) -> int
 
 
 def determine_dampener(weighted_growth_history: list[float], config: BuffettConfig) -> float:
-    if not config.dampener_enabled:
+    if not config.dampener_enabled or config.dampener_mode == "none":
         return 1.0
 
     if config.dampener_mode == "fixed":
@@ -131,6 +136,15 @@ def determine_dampener(weighted_growth_history: list[float], config: BuffettConf
         dampener = config.dampener_start - (negative_years * config.dampener_reduction_per_non_positive)
         if negative_years > 0:
             dampener += config.dampener_addback
+        return dampener
+
+    if config.dampener_mode == "legacy_1_0":
+        dampener = 1.0
+        for value in weighted_growth_history:
+            if value < 0:
+                dampener -= 0.1
+        if dampener != 1.0:
+            dampener += 0.1
         return dampener
 
     dampener = config.legacy_max_dampener
@@ -199,6 +213,10 @@ def evaluate_buffett_valuation(stock: BuffettInput, config: BuffettConfig | None
         rejection_reasons.append("buy_price_must_be_positive")
 
     current_price_gap = None if buy_price == 0 else (stock.current_price - buy_price) / buy_price
+    current_vs_target_gap = None if target_price == 0 else (stock.current_price - target_price) / target_price
+    current_vs_projected_future_gap = (
+        None if projected_future_price == 0 else (stock.current_price - projected_future_price) / projected_future_price
+    )
     accepted = not rejection_reasons
 
     return BuffettValuation(
@@ -220,6 +238,10 @@ def evaluate_buffett_valuation(stock: BuffettInput, config: BuffettConfig | None
         buy_price=buy_price,
         sell_price=sell_price,
         current_price_gap=current_price_gap,
+        current_vs_target_gap=current_vs_target_gap,
+        current_vs_target_amount=stock.current_price - target_price,
+        current_vs_projected_future_gap=current_vs_projected_future_gap,
+        current_vs_projected_future_amount=stock.current_price - projected_future_price,
         accepted=accepted,
         rejection_reasons=rejection_reasons,
         sources=stock.sources,

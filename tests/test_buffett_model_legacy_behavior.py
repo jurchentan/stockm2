@@ -23,6 +23,10 @@ def test_legacy_weighting_and_buy_price_for_aapl(fixture_provider: FixtureProvid
     assert valuation.dampener == pytest.approx(0.8)
     assert valuation.buy_price == pytest.approx(39.17366359745202, rel=1e-6)
     assert valuation.current_price_gap == pytest.approx((195.0 - valuation.buy_price) / valuation.buy_price)
+    assert valuation.current_vs_target_gap == pytest.approx((195.0 - valuation.target_price) / valuation.target_price)
+    assert valuation.current_vs_projected_future_gap == pytest.approx(
+        (195.0 - valuation.projected_future_price) / valuation.projected_future_price
+    )
 
 
 def test_rejects_when_more_than_two_non_positive_growth_years(fixture_provider: FixtureProvider) -> None:
@@ -97,7 +101,20 @@ def test_insufficient_eps_history_for_weighted_legacy_mode_raises() -> None:
         pe_history=[10.0] * 10,
         current_price=10.0,
     )
-    with pytest.raises(ValueError, match="weighted legacy mode expects growth history length to match year weights"):
+    valuation = evaluate_buffett_valuation(stock)
+    assert valuation.weighted_eps_growth_history == pytest.approx([0.12, 0.13, 0.15])
+
+
+def test_growth_history_longer_than_weight_series_raises() -> None:
+    stock = BuffettInput(
+        ticker="LONG",
+        company_name="Long History",
+        latest_eps=2.0,
+        eps_growth_history=[0.1] * 11,
+        pe_history=[10.0] * 10,
+        current_price=10.0,
+    )
+    with pytest.raises(ValueError, match="at most year weights length"):
         evaluate_buffett_valuation(stock)
 
 
@@ -115,9 +132,47 @@ def test_projected_eps_can_turn_negative_and_reject() -> None:
     config.clip_growth = False
     config.dampener_mode = "fixed"
     config.fixed_dampener = 1.0
+    config.forecast_years = 9
     valuation = evaluate_buffett_valuation(stock, config)
     assert valuation.projected_eps < 0
     assert "projected_eps_must_be_positive" in valuation.rejection_reasons
+
+
+def test_none_dampener_mode_disables_dampening() -> None:
+    stock = BuffettInput(
+        ticker="NONE",
+        company_name="No Dampener",
+        latest_eps=5.0,
+        eps_growth_history=[0.1] * 10,
+        pe_history=[20.0] * 10,
+        current_price=100.0,
+    )
+    config = BuffettConfig.legacy_defaults()
+    config.weighted_growth = False
+    config.dampener_mode = "none"
+
+    valuation = evaluate_buffett_valuation(stock, config)
+
+    assert valuation.dampener == pytest.approx(1.0)
+    assert valuation.adjusted_eps_growth == pytest.approx(valuation.average_eps_growth)
+
+
+def test_legacy_1_0_mode_starts_from_one() -> None:
+    stock = BuffettInput(
+        ticker="LEGACY10",
+        company_name="Legacy One",
+        latest_eps=5.0,
+        eps_growth_history=[0.1, -0.1, 0.1, -0.1],
+        pe_history=[20.0] * 4,
+        current_price=100.0,
+    )
+    config = BuffettConfig.legacy_defaults()
+    config.weighted_growth = False
+    config.dampener_mode = "legacy_1_0"
+
+    valuation = evaluate_buffett_valuation(stock, config)
+
+    assert valuation.dampener == pytest.approx(0.9)
 
 
 def test_non_numeric_api_data_raises() -> None:
